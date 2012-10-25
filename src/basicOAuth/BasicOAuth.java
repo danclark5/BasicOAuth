@@ -4,12 +4,19 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+
+import javax.net.ssl.SSLContext;
+
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.scheme.Scheme;
+import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 
@@ -21,9 +28,32 @@ public class BasicOAuth {
 	 */
 	public static void test() {
 		HttpClient http_client = new DefaultHttpClient();
-		HttpGet http_get = new HttpGet("http://danclark.h0stname.net");
+		
+		// --------Trick the library
+
+		SSLSocketFactory sf;
+		try {
+			SSLContext sslcontext = SSLContext.getInstance("TLS"); 
+			sslcontext.init(null, null, null); 
+			sf = new SSLSocketFactory(
+					sslcontext,
+				    SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+			Scheme sch = new Scheme("https", 443, sf);
+			http_client.getConnectionManager().getSchemeRegistry().register(sch);
+		} catch (NoSuchAlgorithmException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		} catch (KeyManagementException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+			// -------- END Trick the library
+			
+		HttpGet http_get = new HttpGet("https://api.imgur.com/oauth/request_token");
+		System.out.println("test");
 		try {
 			HttpResponse response = http_client.execute(http_get);
+			System.out.println("test");
 			HttpEntity entity = response.getEntity();
 			System.out.println(response.getStatusLine());
 			InputStream instream = entity.getContent();
