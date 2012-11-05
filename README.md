@@ -12,10 +12,13 @@ An attempt to roll my own OAuth client library in Java. The goals of this are th
 
 
 ## Changelog
-*2012-10-28* : Created a new class to refactor the logic needed to interact with 
+* 2012-11-04 : Refactored much of the logic. Also discovered that I
+    misinterpreted how to generate an OAuth signature (but I think I might still
+    be wrong.
+* 2012-10-28 : Created a new class to refactor the logic needed to interact with 
     an OAuth server. Pretty much gave up on HTTPS with Imgur. Something appears
     to be wrong with their certificate (see: echo '' | openssl s_client  -connect api.imgur.com:443)
-*2012-10-23* : Became aware of how to parse the response entity to retrieve the
+* 2012-10-23 : Became aware of how to parse the response entity to retrieve the
     http payload.
-*2012-10-21* : Initial build of client, request, and response handling.
+* 2012-10-21 : Initial build of client, request, and response handling.
     Everthing makes sense except for the response.

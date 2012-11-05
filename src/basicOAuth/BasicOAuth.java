@@ -71,9 +71,11 @@ public class BasicOAuth {
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
 		//test();
+		//System.setProperty("jsse.enableSNIExtension","true");
+		//System.out.println(System.getProperty("jsse.enableSNIExtension"));
 		readConfiguration();
 		OAuthSession test_session = new OAuthSession(properties.getProperty("consumer_key"),
-				properties.getProperty("consumer_key"), "http://api.imgur.com/oauth/request_token",
+				properties.getProperty("consumer_key"), "https://api.imgur.com/oauth/request_token",
 				"https://api.imgur.com/oauth/authorize",
 				"https://api.imgur.com/oauth/access_token");
 		test_session.getRequestToken();
