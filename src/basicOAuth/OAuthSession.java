@@ -41,12 +41,14 @@ public class OAuthSession {
 	private String consumer_key;
 	private String consumer_secret;
 	private String request_end_point_uri;
-	private String requestToken;
-	private String authorizationEndPointUri;
-	private String accessEndPointUri;
+	private String token;
+	private String token_secret;
+	private String authorization_end_point_uri;
+	private String access_end_point_uri;
 	
 	private String signature_base_string;
 	private List <NameValuePair> oauth_parameters;
+	private List <NameValuePair> response_values;
 	
 	 private static Comparator<NameValuePair> COMPARATOR = new Comparator<NameValuePair>()
 			     {
@@ -56,15 +58,17 @@ public class OAuthSession {
 			         }
 			     };
 
-	public OAuthSession(String key, String secret, String requestUri, String authorizationUri, String accessUri){
+	public OAuthSession(String key, String secret, String request_uri, String authorization_uri, String access_uri){
 		consumer_key = key;
 		consumer_secret = secret;
-		request_end_point_uri = requestUri;
-		authorizationEndPointUri = authorizationUri;
-		accessEndPointUri = accessUri;
+		token = null;
+		token_secret = null;
+		request_end_point_uri = request_uri;
+		authorization_end_point_uri = authorization_uri;
+		access_end_point_uri = access_uri;
 	}
 	
-	private void enableSNIConnections (HttpClient client){
+	private void trustAllHosts(HttpClient client){
 		System.out.println("- Enabling SNI Connections");
 		SSLSocketFactory socket_factory;
 		SSLContext ssl_context;
@@ -93,6 +97,7 @@ public class OAuthSession {
 		oauth_parameters.add(new BasicNameValuePair("oauth_signature_method", "HMAC-SHA1"));
 		String current_timestamp = String.valueOf(System.currentTimeMillis()/1000);
 		oauth_parameters.add(new BasicNameValuePair("oauth_timestamp",current_timestamp));
+		oauth_parameters.add(new BasicNameValuePair("oauth_callback", "oob"));
 		Random rndom = new Random();
 		String nonce = Long.toString(rndom.nextLong(), 36);
 		oauth_parameters.add(new BasicNameValuePair("oauth_nonce",nonce));
@@ -120,7 +125,7 @@ public class OAuthSession {
 			signature_base_string = http_post.getMethod() + "&" + 
 					URLEncoder.encode(http_post.getURI().toString(), "UTF-8") + "&" +
 					URLEncoder.encode(param_string, "UTF-8");
-			System.out.println("--- base string = " + signature_base_string);
+			System.out.println("--- base string = >>" + signature_base_string + "<<");
 		} catch (UnsupportedEncodingException e2) {
 			// TODO Auto-generated catch block
 			e2.printStackTrace();
@@ -128,15 +133,17 @@ public class OAuthSession {
 		try {
 			System.out.println("-- Encode base string");
 		    Mac mac = Mac.getInstance("HmacSHA1");
-		    String digest_key = URLEncoder.encode(consumer_secret + "&", "UTF-8");
+		    String digest_key = URLEncoder.encode(consumer_secret, "UTF-8") + "&";
+		    System.out.println("--- digest_key: " + digest_key);
 		    SecretKeySpec signatureSecret = new SecretKeySpec(digest_key.getBytes(),"HmacSHA1");
 		    mac.init(signatureSecret);
 		    
 		    byte[] digest = mac.doFinal(signature_base_string.getBytes());
 		    System.out.println("--- hex signature: " +  new String(new Hex().encode(digest)));
 		    byte[] base64Bytes = new Base64().encode(digest);
-		    System.out.println("--- base64 signature: " + new String(new Base64().encode(digest)));
 		    String oauth_encoded_signature = new String(base64Bytes);
+		    System.out.println("--- base64 signature: " + oauth_encoded_signature);
+		    
 		    oauth_parameters.add(new BasicNameValuePair("oauth_signature", oauth_encoded_signature));
 		} catch (Exception e) {
 		    System.out.println(e.getMessage());
@@ -149,13 +156,7 @@ public class OAuthSession {
 		try {
 			response = http_client.execute(http_post);
 			HttpEntity entity = response.getEntity();
-			InputStream instream = entity.getContent();
-			Reader r = new InputStreamReader(instream, "US-ASCII");
-			int intch;
-			while ((intch = r.read()) != -1) {
-				char ch = (char) intch;
-				System.out.print(ch);
-			}
+			parseRequest(entity);
 		} catch (ClientProtocolException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -167,11 +168,44 @@ public class OAuthSession {
 		}
 	}
 	
-	private void buildRequest(String uri, String key, String secret){
-		System.out.println("Building request");
+	private void parseRequest(HttpEntity entity){
+		try {
+			InputStream instream = entity.getContent();
+			Reader r = new InputStreamReader(instream, "US-ASCII");
+			int int_ch;
+			String request_staging = "";
+			response_values = new ArrayList<NameValuePair>();
+			while ((int_ch = r.read()) != -1) {
+				char ch = (char) int_ch;
+				System.out.print(ch);
+				if (ch != '&')
+					request_staging += ch;
+				else {
+					String[] split_request_pair = request_staging.split("=");
+					response_values.add(new BasicNameValuePair(split_request_pair[0], split_request_pair[1]));
+					request_staging = "";
+				}
+			}
+			if (request_staging != ""){
+				String[] split_request_pair = request_staging.split("=");
+				response_values.add(new BasicNameValuePair(split_request_pair[0], split_request_pair[1]));
+			}
+			ListIterator <NameValuePair> response_value_iterator = response_values.listIterator();
+			//The following while loop just outputs the parsed response for visual inspection.
+			while (response_value_iterator.hasNext()){
+				NameValuePair response_pair = response_value_iterator.next();
+				System.out.println(response_pair.getName() + ":" + response_pair.getValue());
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private void processRequest(String uri, String key, String secret, String token){
+		System.out.println("Processing request");
 		HttpClient http_client = new DefaultHttpClient();
 		buildOAuthParam();
-		enableSNIConnections(http_client);
+		trustAllHosts(http_client);
 		HttpPost http_post = new HttpPost(uri);
 		buildOAuthSignature(http_post);
 
@@ -180,6 +214,7 @@ public class OAuthSession {
 	}
 	
 	public void getRequestToken(){
-		buildRequest(request_end_point_uri,consumer_key,consumer_secret);
+		//Get temporary credentials
+		processRequest(request_end_point_uri,consumer_key,consumer_secret, token);
 	}
 }
