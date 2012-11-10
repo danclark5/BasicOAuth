@@ -12,6 +12,7 @@ An attempt to roll my own OAuth client library in Java. The goals of this are th
 
 
 ## Changelog
+* 2012-11-10 : Got the logic to get the unauth token working. Also parsing the output.
 * 2012-11-04 : Refactored much of the logic. Also discovered that I
     misinterpreted how to generate an OAuth signature (but I think I might still
     be wrong.
